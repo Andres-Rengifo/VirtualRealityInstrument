@@ -2,12 +2,12 @@ import gsap from "gsap";
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
-import { Howl } from 'howler'; // Import Howler
+import { Howl } from 'howler';
 import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerModelFactory.js';  // Add this import
 
 const scene = new THREE.Scene();
 
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const camera = new THREE.PerspectiveCamera(100, window.innerWidth / window.innerHeight, 0.1, 1000);
 
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -15,50 +15,42 @@ renderer.xr.enabled = true; // Enable WebXR
 document.body.appendChild(renderer.domElement);
 document.body.appendChild(VRButton.createButton(renderer));
 
-// Controllers 
-const controller1 = renderer.xr.getController(0); // Get the first controller
-const controller2 = renderer.xr.getController(1); // Get the second controller
 
-// Add controllers to the scene
-scene.add(controller1);
-scene.add(controller2);
+const geometry = new THREE.BoxGeometry();
+const material = new THREE.MeshBasicMaterial({ color: 0xCC0000 });
+const cube = new THREE.Mesh(geometry, material);
+cube.position.z = -1;
+scene.add(cube);
+const edges = new THREE.EdgesGeometry(geometry); 
+const lineMaterial = new THREE.LineBasicMaterial({ color: 0x000000 }); 
+const wireframe = new THREE.LineSegments(edges, lineMaterial);
+scene.add(wireframe); 
 
-const controller1Raycaster = new THREE.Raycaster();
-const controller2Raycaster = new THREE.Raycaster();
+const light = new THREE.DirectionalLight(0xffffff, 1);
+light.position.set(1, 1, 1).normalize();
+scene.add(light);
 
+camera.position.z = 2;
 
-// Create the controller model factory
-const controllerModelFactory = new XRControllerModelFactory();
-
-// Create and add a model for controller 1
-const controllerModel1 = controllerModelFactory.createControllerModel(controller1);
-controller1.add(controllerModel1); // Attach the model to controller 1
-
-// Create and add a model for controller 2
-const controllerModel2 = controllerModelFactory.createControllerModel(controller2);
-controller2.add(controllerModel2); // Attach the model to controller 2
-
-// Optionally adjust their position or rotation
-controller1.position.set(0, -0.1, -0.05);
-controller2.position.set(0, -0.1, -0.05);
+const groundGeometry = new THREE.PlaneGeometry(10, 10);
+const groundMaterial = new THREE.MeshBasicMaterial({ color: 0xcccccc, side: THREE.DoubleSide });
+const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+ground.rotation.x = Math.PI / 2; 
+ground.position.y = -1; 
+scene.add(ground);
 
 let sound;
-
-// Load sound:
 try {
     sound = new Howl({
-        src: ['./note1.mp3'], // Provide multiple formats for browser compatibility
-        loop: false, // Set to true if you want the sound to loop
-        volume: 1, // Adjust volume (0.0 to 1.0)
-        onend: function() { // Event listener for when the sound finishes playing
-            sound.canPlay = true; // Reset the canPlay flag
+        src: ['./note1.mp3'], 
+        loop: false, 
+        onend: function() { 
+            sound.canPlay = true; 
         }
     });
 
     sound.on('load', function() {
         console.log('Sound loaded!');
-        // Optionally, play the sound immediately after loading:
-        // sound.play();
     });
 
     sound.on('loaderror', function(error) {
@@ -71,22 +63,28 @@ try {
     console.error("Howler initialization error:", error);
 }
 
-const geometry = new THREE.BoxGeometry();
-const material = new THREE.MeshBasicMaterial({ color: 0xCC0000 });
-const cube = new THREE.Mesh(geometry, material);
-scene.add(cube);
+const raycaster = new THREE.Raycaster();
+
+// Controllers 
+const controller1 = renderer.xr.getController(0); 
+const controller2 = renderer.xr.getController(1); 
+
+scene.add(controller1);
+scene.add(controller2);
 
 
-const light = new THREE.DirectionalLight(0xffffff, 1);
-light.position.set(1, 1, 1).normalize();
-scene.add(light);
+const controllerModelFactory = new XRControllerModelFactory();
 
-camera.position.z = 2;
+//model for controller 1
+const controllerModel1 = controllerModelFactory.createControllerModel(controller1);
+controller1.add(controllerModel1); 
 
-const edges = new THREE.EdgesGeometry(geometry); // Create edges geometry
-const lineMaterial = new THREE.LineBasicMaterial({ color: 0x000000 }); // Black lines
-const wireframe = new THREE.LineSegments(edges, lineMaterial); // Create line segments
-scene.add(wireframe); // Add wireframe as a child of the cube
+//model for controller 2
+const controllerModel2 = controllerModelFactory.createControllerModel(controller2);
+controller2.add(controllerModel2); 
+
+controller1.position.set(0, -0.1, -0.05);
+controller2.position.set(0, -0.1, -0.05);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 window.addEventListener('resize', () => {
@@ -95,21 +93,15 @@ window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-const raycaster = new THREE.Raycaster();
-
-// Function to handle cube click
 function onCubeClick(event) {
     const mouse = new THREE.Vector2();
 
-    // Calculate mouse position in normalized device coordinates (-1 to +1) for both axes
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-    // Update the raycaster with the mouse position
     raycaster.setFromCamera(mouse, camera);
 
-    // Calculate objects intersecting the raycaster
-    const intersects = raycaster.intersectObjects([cube]); // Pass an array of objects to check
+    const intersects = raycaster.intersectObjects([cube]); 
 
     if (intersects.length > 0) {
         const clickedCube = intersects[0].object;
@@ -134,14 +126,102 @@ function onCubeClick(event) {
 }
 window.addEventListener('click', onCubeClick);
 
-renderer.setAnimationLoop(function () {
-    controls.update(); // Update OrbitControls
-    cube.rotation.x += 0.005; // Example animation
-    renderer.render(scene, camera);
-    wireframe.position.copy(cube.position); // Keep the wireframe synced
+// Track intersection state for each controller
+let isIntersectingController1 = false;
+let isIntersectingController2 = false;
+
+const arrowHelpers = [controller1, controller2].map(() => {
+    const arrowHelper = new THREE.ArrowHelper(
+        new THREE.Vector3(0, 0, -1), 
+        new THREE.Vector3(0, 0, 0),  
+        1,                           
+        0x00ff00                     
+    );
+    scene.add(arrowHelper); 
+    return arrowHelper;
+});
+
+// Function to map velocity to volume using an exponential curve
+function velocityToVolume(velocity, vMax = 5) {
+    const vMin = 0.1; // Minimum velocity to trigger sound
+    const volMin = 0.00001;
+    const volMax = 1.0;
+    const alpha = 5; // Adjust this for sensitivity
+  
+    velocity = Math.min(Math.max(velocity, vMin), vMax); // Clamp velocity
+    return volMin + (volMax - volMin) * (1 - Math.exp(-alpha * (velocity / vMax)));
+}
+  
+// Variables to store previous positions and timestamps
+let previousPosition1 = new THREE.Vector3();
+let previousPosition2 = new THREE.Vector3();
+let previousTime = performance.now()
+
+// Function to handle xylophone hit
+function playNote(velocity) {
+    const volume = velocityToVolume(velocity);
+    sound.volume(volume);
+    sound.play();
+    console.log(`Velocity: ${velocity}, Volume: ${volume.toFixed(2)}`);
+}
+
+renderer.setAnimationLoop(() => {
+
+    const currentTime = performance.now();
+    const deltaTime = (currentTime - previousTime) / 1000; // Convert to seconds
+    previousTime = currentTime;
+
+    controls.update();
+    cube.rotation.x += 0.005;
+
+    // Sync wireframe with cube
+    wireframe.position.copy(cube.position);
     wireframe.rotation.copy(cube.rotation);
 
     renderer.render(scene, camera);
+
+    // Controller raycasting and intersection check
+    [controller1, controller2].forEach((controller, index) => {
+        if (!controller.matrixWorld) return; // Skip if controller matrix is not available
+
+        const tempMatrix = new THREE.Matrix4();
+        tempMatrix.identity().extractRotation(controller.matrixWorld);
+
+        raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+        raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+
+        const arrowHelper = arrowHelpers[index];
+        arrowHelper.position.copy(raycaster.ray.origin);
+        arrowHelper.setDirection(raycaster.ray.direction);
+
+        const intersects = raycaster.intersectObjects([cube]);
+
+        // Check if the controller is currently intersecting the cube
+        const isIntersectingNow = intersects.length > 0;
+
+        let isIntersectingController = index === 0 ? isIntersectingController1 : isIntersectingController2;
+
+        const currentPosition = new THREE.Vector3().setFromMatrixPosition(controller.matrixWorld);
+        const previousPosition = index === 0 ? previousPosition1 : previousPosition2;
+        const distance = currentPosition.distanceTo(previousPosition);
+        const velocity = distance / deltaTime; // Velocity in units per second
+
+        // Update previous position
+        previousPosition.copy(currentPosition);
+
+        // Play sound only when intersection starts
+        if (isIntersectingNow && !isIntersectingController) {
+            if (sound && sound.state() === 'loaded') {
+                playNote(velocity);
+            }
+        }
+
+        if (index === 0) {
+            isIntersectingController1 = isIntersectingNow;
+        } else {
+            isIntersectingController2 = isIntersectingNow;
+        }
+    });
 });
 
 function animate() {
@@ -181,7 +261,6 @@ renderer.xr.addEventListener('sessionend', () => {
 renderer.xr.addEventListener('error', (error) => {
     console.error("WebXR Error:", error);
 });
-
 
 
 
